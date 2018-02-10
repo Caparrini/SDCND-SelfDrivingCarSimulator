@@ -3,7 +3,8 @@ import os
 import cv2
 import numpy as np
 
-data_dir = os.path.join(os.getcwd(), "data")
+main_dir = os.path.dirname(os.path.realpath(__file__))
+data_dir = os.path.join(main_dir, "data")
 
 lines = []
 with open(os.path.join(data_dir, "driving_log.csv")) as csv_file:
@@ -28,13 +29,22 @@ y_train = np.array(measurements)
 
 
 from keras.models import Sequential
-from keras.layers import Flatten, Dense
+from keras.layers.core import Dense, Activation, Flatten, Dropout
+from keras.layers.convolutional import Conv2D
+from keras.layers.pooling import MaxPooling2D
+
+
 
 model = Sequential()
-model.add(Flatten(input_shape=(160,320,3)))
+model.add(Conv2D(32, (3, 3), input_shape=(160,320,3)))
+model.add(MaxPooling2D((2, 2)))
+model.add(Dropout(0.5))
+model.add(Activation('relu'))
+model.add(Dense(180))
+model.add(Flatten())
 model.add(Dense(1))
 
 model.compile(loss='mse', optimizer='adam')
-model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=100)
+model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=20)
 
-model.save("model.h5")
+model.save(os.path.join(main_dir, "model.h5"))
