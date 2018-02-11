@@ -3,6 +3,7 @@ import base64
 from datetime import datetime
 import os
 import shutil
+import model
 
 import numpy as np
 import socketio
