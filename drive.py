@@ -3,7 +3,8 @@ import base64
 from datetime import datetime
 import os
 import shutil
-import model
+from model import init_gpu_conf
+init_gpu_conf()
 
 import numpy as np
 import socketio
@@ -45,7 +46,7 @@ class SimplePIController:
 
 
 controller = SimplePIController(0.1, 0.002)
-set_speed = 9
+set_speed = 12
 controller.set_desired(set_speed)
 
 
