@@ -181,13 +181,13 @@ def get_nmodel():
 if __name__ == "__main__":
     init_gpu_conf()
 
-    #X_train, y_train = get_dataset2()
-    train_gen, validation_gen, n_train, n_valid = get_dataset_generators()
+    X_train, y_train = get_dataset2()
+    #train_gen, validation_gen, n_train, n_valid = get_dataset_generators()
     model = get_nmodel()
     adam = Adam(lr=0.0005)
     model.compile(loss='mse', optimizer=adam)
-    #history_object = model.fit(X_train, y_train, validation_split=0.3, shuffle=True, epochs=1)
-    history_object = model.fit_generator(generator=train_gen,samples_per_epoch=n_train,validation_data=validation_gen, nb_val_samples=n_valid, nb_epoch=3 )
+    history_object = model.fit(X_train, y_train, validation_split=0.3, shuffle=True, epochs=1)
+    #history_object = model.fit_generator(generator=train_gen,samples_per_epoch=n_train,validation_data=validation_gen, nb_val_samples=n_valid, nb_epoch=3 )
 
     model.save(os.path.join(get_base_path(), "model.h5"))
     ### print the keys contained in the history object
