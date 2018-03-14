@@ -4,12 +4,9 @@ import cv2
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Cropping2D
-from keras.layers.core import Dense, Activation, Flatten, Dropout, Lambda
+from keras.layers.core import Dense, Flatten, Lambda
 from keras.layers.convolutional import Conv2D
-from keras.layers.pooling import MaxPooling2D
-from keras.optimizers import Adam
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 
 
 import tensorflow as tf
@@ -46,12 +43,13 @@ def get_dataset(folders_data=["data","data2"]):
             source_path = line[0]
             filename = source_path.split("/")[-1]
             current_path = os.path.join(data_dir, "IMG", filename)
-            image = mpimg.imread(current_path)
+            imageBGR = cv2.imread(current_path)
+            image = cv2.cvtColor(imageBGR, cv2.COLOR_BGR2RGB)
             images.append(image)
             measurement = float(line[3])
             measurements.append(measurement)
             #Augmented data
-            images.append(np.fliplr(image))
+            images.append(cv2.flip(image,1))
             measurements.append(-measurement)
 
     # Transform to np.array
@@ -63,7 +61,7 @@ def get_dataset2(folders_data=["data","data1","data2"]):
 
     main_dir = get_base_path()
     data_dirs = [os.path.join(main_dir, folder_data) for folder_data in folders_data]
-    correct_factor = 0.3
+    correct_factor = 0.11
 
     # Read the csv file to collect the image and steering data
     images = []
@@ -87,9 +85,14 @@ def get_dataset2(folders_data=["data","data1","data2"]):
             current_path_right = os.path.join(data_dir, "IMG", filename_right)
 
             #original image
-            image_center = mpimg.imread(current_path_center)
-            image_left = mpimg.imread(current_path_left)
-            image_right = mpimg.imread(current_path_right)
+            image_centerBGR = cv2.imread(current_path_center)
+            image_center = cv2.cvtColor(image_centerBGR, cv2.COLOR_BGR2RGB)
+
+            image_leftBGR = cv2.imread(current_path_left)
+            image_left = cv2.cvtColor(image_leftBGR, cv2.COLOR_BGR2RGB)
+
+            image_rightBGR = cv2.imread(current_path_right)
+            image_right = cv2.cvtColor(image_rightBGR, cv2.COLOR_BGR2RGB)
 
             aux_images = [image_center, image_left, image_right]
             images.extend(aux_images)
@@ -102,7 +105,7 @@ def get_dataset2(folders_data=["data","data1","data2"]):
             steer_angles.extend(aux_angles)
             #Augmented data (flipped image)
             for image in aux_images:
-                images.append(np.fliplr(image))
+                images.append(cv2.flip(image,1))
             for angle in aux_angles:
                 steer_angles.append(-angle)
 
@@ -124,7 +127,8 @@ def generator(samples, batch_size=32):
                 source_path = batch_sample[0]
                 filename = source_path.split("/")[-1]
                 current_path = os.path.join(get_base_path(), "data", "IMG", filename)
-                image = mpimg.imread(current_path)
+                imageBGR = cv2.imread(current_path)
+                image = cv2.cvtColor(imageBGR, cv2.COLOR_BGR2RGB)
 
                 images.append(image)
                 measurement = float(batch_sample[3])
@@ -134,15 +138,19 @@ def generator(samples, batch_size=32):
             y_train = np.array(measurements)
             yield shuffle(X_train, y_train)
 
-def get_dataset_generators():
+def get_dataset_generators(folders_data=["data","data1","data2"]):
+    main_dir = get_base_path()
+    data_dirs = [os.path.join(main_dir, folder_data) for folder_data in folders_data]
 
     samples = []
-    data_log = os.path.join(get_base_path(),"data1","driving_log.csv")
-    with open(data_log) as csvfile:
-        reader = csv.reader(csvfile)
-        for line in reader:
-            samples.append(line)
-        del samples[0]
+    for data_dir in data_dirs:
+
+        data_log = os.path.join(get_base_path(),data_dir,"driving_log.csv")
+        with open(data_log) as csvfile:
+            reader = csv.reader(csvfile)
+            for line in reader:
+                samples.append(line)
+            del samples[0]
     train_samples, validation_samples = train_test_split(samples, test_size=0.2)
 
     train_generator = generator(train_samples, batch_size=32)
@@ -156,38 +164,34 @@ def get_dummymodel():
     model.add(Dense(1))
     return model
 
-def get_nmodel():
+def get_nVidiaModel():
     model = Sequential()
-    model.add(Cropping2D(cropping=((70,25), (0,0)),input_shape=(160,320,3)))
+    model.add(Cropping2D(cropping=((50,20), (0,0)),input_shape=(160,320,3)))
     model.add(Lambda(lambda x: x / 255.0 - 0.5))
 
-    model.add(Conv2D(24, kernel_size=(5, 5), activation='relu'))
-    model.add(Conv2D(36, kernel_size=(5, 5), activation='relu'))
-    model.add(Conv2D(48, kernel_size=(5, 5), activation='relu'))
+    model.add(Conv2D(24, kernel_size=(5, 5), subsample=(2,2), activation='relu'))
+    model.add(Conv2D(36, kernel_size=(5, 5), subsample=(2,2), activation='relu'))
+    model.add(Conv2D(48, kernel_size=(5, 5), subsample=(2,2), activation='relu'))
     model.add(Conv2D(64, kernel_size=(3, 3), activation='relu'))
     model.add(Conv2D(64, kernel_size=(3, 3), activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Dropout(0.25))
     model.add(Flatten())
     model.add(Dense(100))
-    model.add(Dropout(0.2))
     model.add(Dense(50))
     model.add(Dense(10))
-    model.add(Dropout(0.2))
     model.add(Dense(1))
+
 
     return model
 
 if __name__ == "__main__":
     init_gpu_conf()
 
-    X_train, y_train = get_dataset2()
-    #train_gen, validation_gen, n_train, n_valid = get_dataset_generators()
-    model = get_nmodel()
-    adam = Adam(lr=0.0005)
-    model.compile(loss='mse', optimizer=adam)
-    history_object = model.fit(X_train, y_train, validation_split=0.3, shuffle=True, epochs=1)
-    #history_object = model.fit_generator(generator=train_gen,samples_per_epoch=n_train,validation_data=validation_gen, nb_val_samples=n_valid, nb_epoch=3 )
+    #X_train, y_train = get_dataset2()
+    train_gen, validation_gen, n_train, n_valid = get_dataset_generators()
+    model = get_nVidiaModel()
+    model.compile(loss='mse', optimizer='adam')
+    ##history_object = model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=3)
+    history_object = model.fit_generator(generator=train_gen,samples_per_epoch=n_train,validation_data=validation_gen, nb_val_samples=n_valid, nb_epoch=3 )
 
     model.save(os.path.join(get_base_path(), "model.h5"))
     ### print the keys contained in the history object
